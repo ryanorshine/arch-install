@@ -2,90 +2,107 @@
 set -e  # Exit on any error
 
 # Variables
-DISK="/dev/sdb5"  # Adjust if your M.2 drive identifier is different
+DISK="/dev/sdX"  # Replace with your SSD device (e.g., /dev/sda or /dev/nvme0n1)
 HOSTNAME="archy"
-USER="archy"
-PASSWORD="ryan"
+ROOT_PASSWORD="rootpass"
+USER="archuser"
+USER_PASSWORD="userpass"
 KEYBOARD="us"
-LOCALE_MAIN="en_US.UTF-8"
-LOCALE_SECONDARY="de_DE.UTF-8"
+LOCALE="en_US.UTF-8"
 
 # Partitioning and Formatting
-echo "Partitioning the disk..."
 parted -s $DISK mklabel gpt
 parted -s $DISK mkpart primary fat32 1MiB 512MiB
 parted -s $DISK set 1 esp on
 parted -s $DISK mkpart primary ext4 512MiB 100%
 
-echo "Formatting partitions..."
-mkfs.fat -F32 "${DISK}p1"
-mkfs.ext4 "${DISK}p2"
+mkfs.fat -F32 "${DISK}1"
+mkfs.ext4 "${DISK}2"
 
-echo "Mounting partitions..."
-mount "${DISK}p2" /mnt
+mount "${DISK}2" /mnt
 mkdir /mnt/boot
-mount "${DISK}p1" /mnt/boot
+mount "${DISK}1" /mnt/boot
 
 # Base Installation
-echo "Installing base system..."
-pacstrap /mnt base linux linux-firmware nano vim networkmanager amd-ucode
+pacstrap /mnt base linux linux-firmware networkmanager
 
 # Generate fstab
-echo "Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Chroot and Configuration
-echo "Entering chroot environment..."
 arch-chroot /mnt /bin/bash <<EOF
-    # Timezone
-    echo "Setting timezone to auto-detect..."
-    timedatectl set-ntp true
-
-    # Locale
-    echo "$LOCALE_MAIN UTF-8" > /etc/locale.gen
-    echo "$LOCALE_SECONDARY UTF-8" >> /etc/locale.gen
+    # Timezone and Locale
+    ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+    hwclock --systohc
+    echo "$LOCALE UTF-8" > /etc/locale.gen
     locale-gen
-    echo "LANG=$LOCALE_MAIN" > /etc/locale.conf
+    echo "LANG=$LOCALE" > /etc/locale.conf
     echo "KEYMAP=$KEYBOARD" > /etc/vconsole.conf
 
-    # Hostname and Hosts
+    # Hostname and Networking
     echo "$HOSTNAME" > /etc/hostname
     echo -e "127.0.0.1\tlocalhost\n::1\tlocalhost\n127.0.1.1\t$HOSTNAME.localdomain\t$HOSTNAME" > /etc/hosts
+    echo "root:$ROOT_PASSWORD" | chpasswd
 
-    # Root Password
-    echo "root:$PASSWORD" | chpasswd
+    # User Account
+    useradd -m $USER
+    echo "$USER:$USER_PASSWORD" | chpasswd
+    usermod -aG wheel $USER
+    echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
 
     # Bootloader
     pacman -S --noconfirm grub efibootmgr
     grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
     grub-mkconfig -o /boot/grub/grub.cfg
 
-    # Create User
-    useradd -m $USER
-    echo "$USER:$PASSWORD" | chpasswd
-    usermod -aG wheel $USER
-    echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
+    # Essential Tools and Fonts
+    pacman -S --noconfirm base-devel python python-pip vim ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji alsa-utils pulseaudio pavucontrol
 
-    # Install GNOME and Display Manager
-    pacman -S --noconfirm xorg gdm gnome gnome-extra gnome-tweaks
+    # Desktop Environment and GNOME Settings
+    pacman -S --noconfirm xorg gdm gnome gnome-themes-extra gnome-shell-extensions
     systemctl enable gdm
     systemctl enable NetworkManager
 
-    # Install NVIDIA Drivers
-    pacman -S --noconfirm nvidia nvidia-utils nvidia-settings lib32-nvidia-utils cuda
+    # Theme Installation (Lavanda GTK Dark)
+    git clone https://github.com/vinceliuice/Lavanda-gtk-theme.git /tmp/Lavanda-gtk-theme
+    cd /tmp/Lavanda-gtk-theme
+    ./install.sh -d  # Install dark theme
+    cd ~
+    rm -rf /tmp/Lavanda-gtk-theme
 
-    # Python and Miniforge
-    pacman -S --noconfirm python python-pip python-virtualenv
+    # Set GNOME Settings for Theme and Dark Mode
+    gsettings set org.gnome.desktop.interface gtk-theme "Lavanda-dark"
+    gsettings set org.gnome.desktop.wm.preferences theme "Lavanda-dark"
+    gsettings set org.gnome.shell.extensions.user-theme name "Lavanda-dark"
+
+    # Additional Software
+    pacman -S --noconfirm firefox thunderbird libreoffice-fresh vlc p7zip unrar unzip tar obsidian
+
+    # Miniforge Installation
     curl -L https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o /tmp/Miniforge3.sh
     bash /tmp/Miniforge3.sh -b -p /opt/miniforge3
     ln -s /opt/miniforge3/bin/conda /usr/bin/conda
-    conda init bash
 
-    # Install Additional Applications
-    pacman -S --noconfirm firefox thunderbird nano
+    # NVIDIA Drivers
+    pacman -S --noconfirm nvidia nvidia-utils nvidia-settings
+
+    # Disable Mouse Acceleration
+    mkdir -p /etc/X11/xorg.conf.d
+    echo 'Section "InputClass"
+        Identifier "MyMouse"
+        MatchIsPointer "yes"
+        Option "AccelerationProfile" "-1"
+        Option "AccelerationScheme" "none"
+        Option "AccelSpeed" "0"
+    EndSection' > /etc/X11/xorg.conf.d/50-mouse-acceleration.conf
+
+    # Sound Configuration
+    systemctl enable --now pulseaudio
+    alsactl init
+
+    # Clean Up
+    echo "Installation complete inside chroot."
 EOF
 
-# Unmount and Finish
-echo "Unmounting partitions..."
 umount -R /mnt
 echo "Installation complete! Reboot your system."
