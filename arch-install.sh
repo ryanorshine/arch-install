@@ -68,17 +68,33 @@ arch-chroot /mnt /bin/bash <<EOF
     usermod -aG wheel $USER
     echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
 
-    pacman -S --noconfirm grub efibootmgr nvidia-dkms nvidia-utils linux-zen-headers xorg gdm gnome firefox vlc p7zip unzip tar
+    pacman -S --noconfirm grub efibootmgr nvidia-dkms nvidia-utils linux-zen-headers xorg firefox vlc p7zip unzip tar
     grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
     grub-mkconfig -o /boot/grub/grub.cfg
 
-    systemctl enable gdm
     systemctl enable NetworkManager
     systemctl enable systemd-timesyncd
     systemctl enable systemd-zram-setup@zram0
 
     # DKMS for NVIDIA
     dkms install nvidia/$(pacman -Qi nvidia | grep Version | awk '{print $3}')
+
+    # Install Kitty
+    pacman -S --noconfirm kitty
+    mkdir -p /home/$USER/.config/kitty
+    cat <<EOK > /home/$USER/.config/kitty/kitty.conf
+include ./theme.conf
+background_opacity 0.9
+use_gpu yes
+EOK
+    curl -o /home/$USER/.config/kitty/theme.conf https://raw.githubusercontent.com/dexpota/kitty-themes/master/themes/ayu_mirage.conf
+    chown -R $USER:$USER /home/$USER/.config/kitty
+
+    # Install paru (AUR helper)
+    pacman -S --needed --noconfirm base-devel git
+    su - $USER -c "git clone https://aur.archlinux.org/paru.git"
+    su - $USER -c "cd paru && makepkg -si --noconfirm"
+    su - $USER -c "rm -rf paru"
 EOF
 
 # Finish Up
