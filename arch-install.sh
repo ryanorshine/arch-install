@@ -56,54 +56,17 @@ arch-chroot /mnt /bin/bash <<EOF
     grub-mkconfig -o /boot/grub/grub.cfg
 
     # Essential Tools and Fonts
-    pacman -S --noconfirm base-devel python python-pip vim ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji alsa-utils pulseaudio pavucontrol
+    pacman -S --noconfirm base-devel python python-pip vim ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji
 
-    # Desktop Environment and GNOME Settings
+    # Desktop Environment and GNOME
     pacman -S --noconfirm xorg gdm gnome gnome-themes-extra gnome-shell-extensions
     systemctl enable gdm
     systemctl enable NetworkManager
 
-    # Install Lavanda GTK Theme (Dark Mode)
-    git clone https://github.com/vinceliuice/Lavanda-gtk-theme.git /tmp/Lavanda-gtk-theme
-    cd /tmp/Lavanda-gtk-theme
-    ./install.sh -d  # Install the dark variant
-    cd ~
-    rm -rf /tmp/Lavanda-gtk-theme
-
-    # Apply the Dark Mode Theme
-    gsettings set org.gnome.desktop.interface gtk-theme "Lavanda-dark"
-    gsettings set org.gnome.desktop.wm.preferences theme "Lavanda-dark"
-    gsettings set org.gnome.shell.extensions.user-theme name "Lavanda-dark"
-
-    # Ensure User Themes Extension is Enabled
-    gnome-extensions enable user-theme@gnome-shell-extensions.gcampax.github.com
-
-    # Additional Software
-    pacman -S --noconfirm firefox thunderbird libreoffice-fresh vlc p7zip unrar unzip tar obsidian
-
-    # Miniforge Installation
-    curl -L https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o /tmp/Miniforge3.sh
-    bash /tmp/Miniforge3.sh -b -p /opt/miniforge3
-    ln -s /opt/miniforge3/bin/conda /usr/bin/conda
-
-    # NVIDIA Drivers
-    pacman -S --noconfirm nvidia nvidia-utils nvidia-settings
-
-    # Disable Mouse Acceleration (Xorg)
-    mkdir -p /etc/X11/xorg.conf.d
-    echo 'Section "InputClass"
-        Identifier "MyMouse"
-        MatchIsPointer "yes"
-        Option "AccelerationProfile" "-1"
-        Option "AccelerationScheme" "none"
-        Option "AccelSpeed" "0"
-    EndSection' > /etc/X11/xorg.conf.d/50-mouse-acceleration.conf
-
-    # Disable Mouse Acceleration (Wayland/GNOME)
-    gsettings set org.gnome.desktop.peripherals.mouse accel-profile "flat"
-
-    # Start Sound Services
+    # Sound Drivers (Realtek HD)
+    pacman -S --noconfirm alsa-utils pulseaudio pavucontrol sof-firmware
     pulseaudio --start
+    alsactl init
 EOF
 
 umount -R /mnt
