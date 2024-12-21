@@ -13,9 +13,9 @@ USER_PASSWORD="your_strong_password_here"
 # Partitioning and Formatting Root Disk
 echo "Partitioning and formatting root disk ($ROOT_DISK)..."
 parted -s $ROOT_DISK mklabel gpt
-parted -s $ROOT_DISK mkpart primary fat32 1MiB 512MiB
+parted -s $ROOT_DISK mkpart primary fat32 1MiB 513MiB
 parted -s $ROOT_DISK set 1 esp on
-parted -s $ROOT_DISK mkpart primary ext4 512MiB -${SWAP_SIZE}
+parted -s $ROOT_DISK mkpart primary ext4 513MiB -${SWAP_SIZE}
 mkfs.fat -F32 "${ROOT_DISK}1"  # EFI partition
 mkfs.ext4 -F "${ROOT_DISK}2" -E discard  # Root partition with TRIM
 
