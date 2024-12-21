@@ -63,17 +63,20 @@ arch-chroot /mnt /bin/bash <<EOF
     systemctl enable gdm
     systemctl enable NetworkManager
 
-    # Theme Installation (Lavanda GTK Dark)
+    # Install Lavanda GTK Theme (Dark Mode)
     git clone https://github.com/vinceliuice/Lavanda-gtk-theme.git /tmp/Lavanda-gtk-theme
     cd /tmp/Lavanda-gtk-theme
-    ./install.sh -d  # Install dark theme
+    ./install.sh -d  # Install the dark variant
     cd ~
     rm -rf /tmp/Lavanda-gtk-theme
 
-    # Set GNOME Settings for Theme and Dark Mode
+    # Apply the Dark Mode Theme
     gsettings set org.gnome.desktop.interface gtk-theme "Lavanda-dark"
     gsettings set org.gnome.desktop.wm.preferences theme "Lavanda-dark"
     gsettings set org.gnome.shell.extensions.user-theme name "Lavanda-dark"
+
+    # Ensure User Themes Extension is Enabled
+    gnome-extensions enable user-theme@gnome-shell-extensions.gcampax.github.com
 
     # Additional Software
     pacman -S --noconfirm firefox thunderbird libreoffice-fresh vlc p7zip unrar unzip tar obsidian
@@ -86,7 +89,7 @@ arch-chroot /mnt /bin/bash <<EOF
     # NVIDIA Drivers
     pacman -S --noconfirm nvidia nvidia-utils nvidia-settings
 
-    # Disable Mouse Acceleration
+    # Disable Mouse Acceleration (Xorg)
     mkdir -p /etc/X11/xorg.conf.d
     echo 'Section "InputClass"
         Identifier "MyMouse"
@@ -96,12 +99,11 @@ arch-chroot /mnt /bin/bash <<EOF
         Option "AccelSpeed" "0"
     EndSection' > /etc/X11/xorg.conf.d/50-mouse-acceleration.conf
 
-    # Sound Configuration
-    systemctl enable --now pulseaudio
-    alsactl init
+    # Disable Mouse Acceleration (Wayland/GNOME)
+    gsettings set org.gnome.desktop.peripherals.mouse accel-profile "flat"
 
-    # Clean Up
-    echo "Installation complete inside chroot."
+    # Start Sound Services
+    pulseaudio --start
 EOF
 
 umount -R /mnt
