@@ -5,7 +5,7 @@ set -e  # Exit on any error
 ROOT_DISK="/dev/sda"  # Replace with your root SSD device
 HOME_DISK="/dev/sdb"  # Replace with your home SSD device
 SWAP_SIZE="34G"       # Disk-based swap size for hibernation
-ZRAM_SIZE="8G"        # ZRAM size for compressed swap
+ZRAM_SIZE="4096"      # ZRAM size in MB
 HOSTNAME="archy"
 USER="archuser"
 USER_PASSWORD="your_strong_password_here"
@@ -88,7 +88,7 @@ arch-chroot /mnt /bin/bash <<EOF
     systemctl enable --now systemd-timesyncd.service
 
     # Enable ZRAM
-    systemctl enable --now /dev/zram0
+    systemctl enable --now systemd-zram-setup@zram0.service
 
     # Enable CPU Performance Governor
     pacman -S --noconfirm cpupower
