@@ -2,7 +2,8 @@
 set -e  # Exit on any error
 
 # Variables
-DISK="/dev/sdX"  # Replace with your SSD device (e.g., /dev/sda or /dev/nvme0n1)
+ROOT_DISK="/dev/sda"  # Replace with your root SSD device
+HOME_DISK="/dev/sdb"  # Replace with your home SSD device
 HOSTNAME="archy"
 ROOT_PASSWORD="rootpass"
 USER="archuser"
@@ -11,25 +12,37 @@ KEYBOARD="us"
 LOCALE="en_US.UTF-8"
 
 # Partitioning and Formatting
-parted -s $DISK mklabel gpt
-parted -s $DISK mkpart primary fat32 1MiB 512MiB
-parted -s $DISK set 1 esp on
-parted -s $DISK mkpart primary ext4 512MiB 100%
+echo "Partitioning and formatting root disk ($ROOT_DISK)..."
+parted -s $ROOT_DISK mklabel gpt
+parted -s $ROOT_DISK mkpart primary fat32 1MiB 512MiB
+parted -s $ROOT_DISK set 1 esp on
+parted -s $ROOT_DISK mkpart primary ext4 512MiB 100%
+mkfs.fat -F32 "${ROOT_DISK}1"  # EFI partition
+mkfs.ext4 "${ROOT_DISK}2"      # Root partition
 
-mkfs.fat -F32 "${DISK}1"
-mkfs.ext4 "${DISK}2"
+echo "Partitioning and formatting home disk ($HOME_DISK)..."
+parted -s $HOME_DISK mklabel gpt
+parted -s $HOME_DISK mkpart primary ext4 1MiB 100%
+mkfs.ext4 "${HOME_DISK}1"      # Home partition
 
-mount "${DISK}2" /mnt
+# Mounting Partitions
+echo "Mounting partitions..."
+mount "${ROOT_DISK}2" /mnt
 mkdir /mnt/boot
-mount "${DISK}1" /mnt/boot
+mount "${ROOT_DISK}1" /mnt/boot
+mkdir /mnt/home
+mount "${HOME_DISK}1" /mnt/home
 
 # Base Installation
+echo "Installing base system..."
 pacstrap /mnt base linux linux-firmware networkmanager
 
 # Generate fstab
+echo "Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Chroot and Configuration
+echo "Entering chroot environment for configuration..."
 arch-chroot /mnt /bin/bash <<EOF
     # Timezone and Locale
     ln -sf /usr/share/zoneinfo/UTC /etc/localtime
@@ -67,7 +80,13 @@ arch-chroot /mnt /bin/bash <<EOF
     pacman -S --noconfirm alsa-utils pulseaudio pavucontrol sof-firmware
     pulseaudio --start
     alsactl init
+
+    # Additional Software
+    pacman -S --noconfirm vlc firefox p7zip unrar unzip tar
 EOF
 
+# Unmount Partitions
+echo "Unmounting partitions..."
 umount -R /mnt
+
 echo "Installation complete! Reboot your system."
