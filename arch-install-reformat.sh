@@ -4,6 +4,7 @@ set -e  # Exit on any error
 # Variables
 ROOT_DISK="/dev/sda"  # Replace with your root SSD device
 HOME_DISK="/dev/sdb"  # Replace with your home SSD device
+SWAP_SIZE="8G"        # Adjust swap size here
 HOSTNAME="archy"
 ROOT_PASSWORD="rootpass"
 USER="archuser"
@@ -11,15 +12,22 @@ USER_PASSWORD="userpass"
 KEYBOARD="us"
 LOCALE="en_US.UTF-8"
 
-# Partitioning and Formatting
+# Partitioning and Formatting Root Disk
 echo "Partitioning and formatting root disk ($ROOT_DISK)..."
 parted -s $ROOT_DISK mklabel gpt
 parted -s $ROOT_DISK mkpart primary fat32 1MiB 512MiB
 parted -s $ROOT_DISK set 1 esp on
-parted -s $ROOT_DISK mkpart primary ext4 512MiB 100%
+parted -s $ROOT_DISK mkpart primary ext4 512MiB -${SWAP_SIZE}
+parted -s $ROOT_DISK mkpart primary linux-swap -${SWAP_SIZE} 100%
 mkfs.fat -F32 "${ROOT_DISK}1"  # EFI partition
 mkfs.ext4 "${ROOT_DISK}2"      # Root partition
+mkswap "${ROOT_DISK}3"         # Swap partition
 
+# Enable Swap
+echo "Enabling swap..."
+swapon "${ROOT_DISK}3"
+
+# Partitioning and Formatting Home Disk
 echo "Partitioning and formatting home disk ($HOME_DISK)..."
 parted -s $HOME_DISK mklabel gpt
 parted -s $HOME_DISK mkpart primary ext4 1MiB 100%
@@ -40,6 +48,10 @@ pacstrap /mnt base linux linux-firmware networkmanager
 # Generate fstab
 echo "Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
+
+# Add Swap to fstab
+echo "Adding swap to fstab..."
+echo "${ROOT_DISK}3 none swap defaults 0 0" >> /mnt/etc/fstab
 
 # Chroot and Configuration
 echo "Entering chroot environment for configuration..."
