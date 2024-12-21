@@ -10,24 +10,16 @@ swapon --show
 echo "Checking ZRAM status..."
 zramctl
 
-# Check user permissions
-echo "Checking user permissions..."
-id $(whoami)
-
 # Check NetworkManager status
 echo "Checking NetworkManager status..."
-systemctl status NetworkManager | grep Active
+systemctl is-active NetworkManager
 
-# Check firewall status
+# Check GDM (GNOME Display Manager) status
+echo "Checking GDM status..."
+systemctl is-active gdm
+
+# Check UFW (firewall) status
 echo "Checking UFW status..."
-sudo ufw status
+ufw status
 
-# Check desktop environment
-echo "Checking if GDM is running..."
-systemctl status gdm | grep Active
-
-# Check system updates
-echo "Checking for updates..."
-sudo pacman -Syu --noconfirm
-
-echo "Startup checks completed!"
+echo "Post-reboot checks completed!"
